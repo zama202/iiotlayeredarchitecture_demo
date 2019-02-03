@@ -38,6 +38,12 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Deploy", "Deploy", "{2CD19A
 		Notes.txt = Notes.txt
 	EndProjectSection
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Documentation", "Documentation", "{6938B26C-F680-46C0-905C-70B9068198D9}"
+	ProjectSection(SolutionItems) = preProject
+		..\..\..\..\Users\riccardo.zamana\Desktop\DEMO\Industrial IoT - Dalle parole ai fatti - 2.pptx = ..\..\..\..\Users\riccardo.zamana\Desktop\DEMO\Industrial IoT - Dalle parole ai fatti - 2.pptx
+		..\..\..\..\Users\riccardo.zamana\Desktop\DEMO\LayeredArchitecture.vsdx = ..\..\..\..\Users\riccardo.zamana\Desktop\DEMO\LayeredArchitecture.vsdx
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
