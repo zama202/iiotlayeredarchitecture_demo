@@ -1,0 +1,758 @@
+#############################################################
+#############################################################
+#
+#
+#  COSTRUIAMO LA RETE e le VM (Linux CoreOS)
+#
+#
+#############################################################
+#############################################################
+
+
+$ResourceGroup="z00060-RG-001"
+$OrderCode="z00060"
+$PrimaryDataCenter="westeurope"
+$SubscriptionID=az account show --query [id] --output tsv
+
+# Create a network security group
+az network nsg create --resource-group ${ResourceGroup} --name ${OrderCode}-NSG-002
+
+# Create a network security group rule for port 22.
+az network nsg rule create --resource-group ${ResourceGroup} --nsg-name ${OrderCode}-NSG-002 --name RULE-22-SSH-NSG --protocol tcp --direction inbound --source-address-prefix '*' --source-port-range '*' --destination-address-prefix '*' --destination-port-range 22 --access allow --priority 1000
+
+# Create a network security group rule for port 5672.
+az network nsg rule create --resource-group ${ResourceGroup} --nsg-name ${OrderCode}-NSG-002 --name RULE-5672-AMQP-NSG --protocol tcp --direction inbound --source-address-prefix '*' --source-port-range '*' --destination-address-prefix '*' --destination-port-range 5672 --access allow --priority 1100
+
+# Create a network security group rule for port 1883.
+az network nsg rule create --resource-group ${ResourceGroup} --nsg-name ${OrderCode}-NSG-002 --name RULE-1883-MQTT-NSG --protocol tcp --direction inbound --source-address-prefix '*' --source-port-range '*' --destination-address-prefix '*' --destination-port-range 1883 --access allow --priority 1200
+
+# Create a network security group rule for port 15672.
+az network nsg rule create --resource-group ${ResourceGroup} --nsg-name ${OrderCode}-NSG-002 --name RULE-15672-AMQPMAN-NSG --protocol tcp --direction inbound --source-address-prefix '*' --source-port-range '*' --destination-address-prefix '*' --destination-port-range 15672 --access allow --priority 1300
+
+# Create a virtual network.
+az network vnet create --resource-group ${ResourceGroup} --location ${PrimaryDataCenter} --name ${OrderCode}-VNT-002 --subnet-name ${OrderCode}-SNT-003 --address-prefix 10.1.0.0/16 --subnet-prefix 10.1.0.0/28
+
+# Create four virtual network cards and associate with public IP address and NSG.
+For ( $i=1; $i -le 4; $i++ ) {
+  az network nic create --resource-group ${ResourceGroup} --name ${OrderCode}-NIC-10$i --vnet-name ${OrderCode}-VNT-002 --subnet ${OrderCode}-SNT-003 --network-security-group ${OrderCode}-NSG-002
+}
+
+# Create four public addresses.
+For ( $i=1; $i -le 4; $i++ ) {
+  az network public-ip create --resource-group ${ResourceGroup} --name ${OrderCode}-PIP-10$i --dns-name edgenode10$i --allocation-method Static
+}
+
+# Create four virtual machines, this creates SSH keys if not present.
+For ( $i=1; $i -le 4; $i++ ) {
+  az vm create --resource-group ${ResourceGroup} --name ${OrderCode}-EDGENODE-10$i --nics ${OrderCode}-NIC-10$i  --os-disk-name ${OrderCode}-HDOS-10$i --image CoreOS --authentication-type password --admin-username azureuser --admin-password ZaRik6e4!!!! --no-wait --size Standard_B2s
+}
+
+#ASSOCIARE A MANO PIP a NIC
+
+#############################################################
+#############################################################
+#
+#
+#  USANDO 4 DOCKER FILE, CREIAMO 4 IMMAGINI DOCKER x i LOADER
+#
+#
+#############################################################
+#############################################################
+
+
+
+
+docker login --username acr001cloudservices --password xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx acr001cloudservices.azurecr.io
+#############################################################
+#Event Loader
+docker build -f Dockerfile_Events_1 -t demo.layeredfactory.acquisition.loader.events.1:1.0 .
+docker tag demo.layeredfactory.acquisition.loader.events.1:1.0 acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.loader.events.1:1.0
+docker push acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.loader.events.1:1.0
+docker build -f Dockerfile_Events_2 -t demo.layeredfactory.acquisition.loader.events.2:1.0 .
+docker tag demo.layeredfactory.acquisition.loader.events.2:1.0 acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.loader.events.2:1.0
+docker push acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.loader.events.2:1.0
+docker build -f Dockerfile_Events_3 -t demo.layeredfactory.acquisition.loader.events.3:1.0 .
+docker tag demo.layeredfactory.acquisition.loader.events.3:1.0 acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.loader.events.3:1.0
+docker push acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.loader.events.3:1.0
+docker build -f Dockerfile_Events_4 -t demo.layeredfactory.acquisition.loader.events.4:1.0 .
+docker tag demo.layeredfactory.acquisition.loader.events.4:1.0 acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.loader.events.4:1.0
+docker push acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.loader.events.4:1.0
+#############################################################
+#Alarm Loader
+docker build -f Dockerfile_Alarms_1 -t demo.layeredfactory.acquisition.loader.alarms.1:1.0 .
+docker tag demo.layeredfactory.acquisition.loader.alarms.1:1.0 acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.loader.alarms.1:1.0
+docker push acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.loader.alarms.1:1.0
+docker build -f Dockerfile_Alarms_2 -t demo.layeredfactory.acquisition.loader.alarms.2:1.0 .
+docker tag demo.layeredfactory.acquisition.loader.alarms.2:1.0 acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.loader.alarms.2:1.0
+docker push acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.loader.alarms.2:1.0
+docker build -f Dockerfile_Alarms_3 -t demo.layeredfactory.acquisition.loader.alarms.3:1.0 .
+docker tag demo.layeredfactory.acquisition.loader.alarms.3:1.0 acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.loader.alarms.3:1.0
+docker push acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.loader.alarms.3:1.0
+docker build -f Dockerfile_Alarms_4 -t demo.layeredfactory.acquisition.loader.alarms.4:1.0 .
+docker tag demo.layeredfactory.acquisition.loader.alarms.4:1.0 acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.loader.alarms.4:1.0
+docker push acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.loader.alarms.4:1.0
+#############################################################
+#Product Loader
+docker build -f Dockerfile_Products_1 -t demo.layeredfactory.acquisition.loader.products.1:1.0 .
+docker tag demo.layeredfactory.acquisition.loader.products.1:1.0 acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.loader.products.1:1.0
+docker push acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.loader.products.1:1.0
+docker build -f Dockerfile_Products_2 -t demo.layeredfactory.acquisition.loader.products.2:1.0 .
+docker tag demo.layeredfactory.acquisition.loader.products.2:1.0 acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.loader.products.2:1.0
+docker push acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.loader.products.2:1.0
+docker build -f Dockerfile_Products_3 -t demo.layeredfactory.acquisition.loader.products.3:1.0 .
+docker tag demo.layeredfactory.acquisition.loader.products.3:1.0 acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.loader.products.3:1.0
+docker push acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.loader.products.3:1.0
+docker build -f Dockerfile_Products_4 -t demo.layeredfactory.acquisition.loader.products.4:1.0 .
+docker tag demo.layeredfactory.acquisition.loader.products.4:1.0 acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.loader.products.4:1.0
+docker push acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.loader.products.4:1.0
+clear
+
+
+
+
+#############################################################
+#############################################################
+#
+#
+#  USANDO N DOCKER FILE, CREIAMO N IMMAGINI DOCKER x i DISPATCHER
+#
+#
+#############################################################
+#############################################################
+
+
+
+
+docker login --username acr001cloudservices --password xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx acr001cloudservices.azurecr.io
+#############################################################
+#event dispatcher
+docker build -f Dockerfile_Events_1 -t demo.layeredfactory.acquisition.dispatcher.events.1:1.0 .
+docker tag demo.layeredfactory.acquisition.dispatcher.events.1:1.0 acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.dispatcher.events.1:1.0
+docker push acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.dispatcher.events.1:1.0
+docker build -f Dockerfile_Events_2 -t demo.layeredfactory.acquisition.dispatcher.events.2:1.0 .
+docker tag demo.layeredfactory.acquisition.dispatcher.events.2:1.0 acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.dispatcher.events.2:1.0
+docker push acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.dispatcher.events.2:1.0
+docker build -f Dockerfile_Events_3 -t demo.layeredfactory.acquisition.dispatcher.events.3:1.0 .
+docker tag demo.layeredfactory.acquisition.dispatcher.events.3:1.0 acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.dispatcher.events.3:1.0
+docker push acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.dispatcher.events.3:1.0
+docker build -f Dockerfile_Events_4 -t demo.layeredfactory.acquisition.dispatcher.events.4:1.0 .
+docker tag demo.layeredfactory.acquisition.dispatcher.events.4:1.0 acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.dispatcher.events.4:1.0
+docker push acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.dispatcher.events.4:1.0
+#############################################################
+#alarm dispatcher
+docker build -f Dockerfile_Alarms_1 -t demo.layeredfactory.acquisition.dispatcher.alarms.1:1.0 .
+docker tag demo.layeredfactory.acquisition.dispatcher.alarms.1:1.0 acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.dispatcher.alarms.1:1.0
+docker push acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.dispatcher.alarms.1:1.0
+docker build -f Dockerfile_Alarms_2 -t demo.layeredfactory.acquisition.dispatcher.alarms.2:1.0 .
+docker tag demo.layeredfactory.acquisition.dispatcher.alarms.2:1.0 acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.dispatcher.alarms.2:1.0
+docker push acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.dispatcher.alarms.2:1.0
+docker build -f Dockerfile_Alarms_3 -t demo.layeredfactory.acquisition.dispatcher.alarms.3:1.0 .
+docker tag demo.layeredfactory.acquisition.dispatcher.alarms.3:1.0 acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.dispatcher.alarms.3:1.0
+docker push acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.dispatcher.alarms.3:1.0
+docker build -f Dockerfile_Alarms_4 -t demo.layeredfactory.acquisition.dispatcher.alarms.4:1.0 .
+docker tag demo.layeredfactory.acquisition.dispatcher.alarms.4:1.0 acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.dispatcher.alarms.4:1.0
+docker push acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.dispatcher.alarms.4:1.0
+#############################################################
+#product dispatcher
+docker build -f Dockerfile_Products_1 -t demo.layeredfactory.acquisition.dispatcher.products.1:1.0 .
+docker tag demo.layeredfactory.acquisition.dispatcher.products.1:1.0 acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.dispatcher.products.1:1.0
+docker push acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.dispatcher.products.1:1.0
+docker build -f Dockerfile_Products_2 -t demo.layeredfactory.acquisition.dispatcher.products.2:1.0 .
+docker tag demo.layeredfactory.acquisition.dispatcher.products.2:1.0 acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.dispatcher.products.2:1.0
+docker push acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.dispatcher.products.2:1.0
+docker build -f Dockerfile_Products_3 -t demo.layeredfactory.acquisition.dispatcher.products.3:1.0 .
+docker tag demo.layeredfactory.acquisition.dispatcher.products.3:1.0 acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.dispatcher.products.3:1.0
+docker push acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.dispatcher.products.3:1.0
+docker build -f Dockerfile_Products_4 -t demo.layeredfactory.acquisition.dispatcher.products.4:1.0 .
+docker tag demo.layeredfactory.acquisition.dispatcher.products.4:1.0 acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.dispatcher.products.4:1.0
+docker push acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.dispatcher.products.4:1.0
+clear
+
+
+
+
+docker build -f Dockerfile1 -t demo.layeredfactory.acquisition.dispatcher.1:1.0 .
+docker tag demo.layeredfactory.acquisition.dispatcher.1:1.0 acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.dispatcher.1:1.0
+docker push acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.dispatcher.1:1.0
+docker build -f Dockerfile2 -t demo.layeredfactory.acquisition.dispatcher.2:1.0 .
+docker tag demo.layeredfactory.acquisition.dispatcher.2:1.0 acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.dispatcher.2:1.0
+docker push acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.dispatcher.2:1.0
+docker build -f Dockerfile3 -t demo.layeredfactory.acquisition.dispatcher.3:1.0 .
+docker tag demo.layeredfactory.acquisition.dispatcher.3:1.0 acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.dispatcher.3:1.0
+docker push acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.dispatcher.3:1.0
+docker build -f Dockerfile4 -t demo.layeredfactory.acquisition.dispatcher.4:1.0 .
+docker tag demo.layeredfactory.acquisition.dispatcher.4:1.0 acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.dispatcher.4:1.0
+docker push acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.dispatcher.4:1.0
+clear
+
+
+#Deploy su nodi Edge
+docker pull acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.dispatcher.events.1:1.0
+docker pull acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.dispatcher.alarms.1:1.0
+docker pull acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.dispatcher.products.1:1.0
+
+docker pull acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.dispatcher.events.2:1.0
+docker pull acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.dispatcher.alarms.2:1.0
+docker pull acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.dispatcher.products.2:1.0
+
+docker pull acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.dispatcher.events.3:1.0
+docker pull acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.dispatcher.alarms.3:1.0
+docker pull acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.dispatcher.products.3:1.0
+
+docker pull acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.dispatcher.events.4:1.0
+docker pull acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.dispatcher.alarms.4:1.0
+docker pull acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.dispatcher.products.4:1.0
+
+
+#############################################################
+#############################################################
+#
+#
+#  DENTRO AD OGNI VM CREIAMO i SERVIZI DENTRO UNO SWARM
+#
+#
+#############################################################
+#############################################################
+
+
+
+
+docker swarm init
+vim docker-compose.yml
+
+
+##############################################################
+version: "3"
+services:
+  rabbitmq:
+    image: acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition:rabbitmq-v.1.0
+    ports:
+     - "15672:15672"
+     - "5672:5672"
+     - "1883:1883"
+    networks:
+     - apps
+    environment:
+     - "RABBITMQ_DEFAULT_USER=node01"
+     - "RABBITMQ_DEFAULT_PASS=node01"
+    hostname: rabbitmq 
+  dispatcher_events:
+    image: acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.dispatcher.events.1:1.0
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: "0.2"
+          memory: 256M
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+    networks:
+      - apps 
+    depends_on:
+       - rabbitmq
+  dispatcher_alarms:
+    image: acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.dispatcher.alarms.1:1.0
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: "0.2"
+          memory: 256M
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+    networks:
+      - apps 
+    depends_on:
+       - rabbitmq	
+  dispatcher_products:
+    image: acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.dispatcher.products.1:1.0
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: "0.2"
+          memory: 256M
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+    networks:
+      - apps 
+    depends_on:
+       - rabbitmq	   
+networks:
+  apps:
+##############################################################
+
+
+##############################################################
+version: "3"
+services:
+  rabbitmq:
+    image: acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition:rabbitmq-v.1.0
+    ports:
+     - "15672:15672"
+     - "5672:5672"
+     - "1883:1883"
+    networks:
+     - apps
+    environment:
+     - "RABBITMQ_DEFAULT_USER=node01"
+     - "RABBITMQ_DEFAULT_PASS=node01"
+    hostname: rabbitmq 
+  dispatcher_events:
+    image: acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.dispatcher.events.2:1.0
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: "0.2"
+          memory: 256M
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+    networks:
+      - apps 
+    depends_on:
+       - rabbitmq
+  dispatcher_alarms:
+    image: acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.dispatcher.alarms.2:1.0
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: "0.2"
+          memory: 256M
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+    networks:
+      - apps 
+    depends_on:
+       - rabbitmq	
+  dispatcher_products:
+    image: acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.dispatcher.products.2:1.0
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: "0.2"
+          memory: 256M
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+    networks:
+      - apps 
+    depends_on:
+       - rabbitmq	   
+networks:
+  apps:
+##############################################################
+
+
+##############################################################
+version: "3"
+services:
+  rabbitmq:
+    image: acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition:rabbitmq-v.1.0
+    ports:
+     - "15672:15672"
+     - "5672:5672"
+     - "1883:1883"
+    networks:
+     - apps
+    environment:
+     - "RABBITMQ_DEFAULT_USER=node01"
+     - "RABBITMQ_DEFAULT_PASS=node01"
+    hostname: rabbitmq 
+  dispatcher_events:
+    image: acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.dispatcher.events.3:1.0
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: "0.2"
+          memory: 256M
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+    networks:
+      - apps 
+    depends_on:
+       - rabbitmq
+  dispatcher_alarms:
+    image: acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.dispatcher.alarms.3:1.0
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: "0.2"
+          memory: 256M
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+    networks:
+      - apps 
+    depends_on:
+       - rabbitmq	
+  dispatcher_products:
+    image: acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.dispatcher.products.3:1.0
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: "0.2"
+          memory: 256M
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+    networks:
+      - apps 
+    depends_on:
+       - rabbitmq	   
+networks:
+  apps:
+##############################################################
+
+
+##############################################################
+version: "3"
+services:
+  rabbitmq:
+    image: acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition:rabbitmq-v.1.0
+    ports:
+     - "15672:15672"
+     - "5672:5672"
+     - "1883:1883"
+    networks:
+     - apps
+    environment:
+     - "RABBITMQ_DEFAULT_USER=node01"
+     - "RABBITMQ_DEFAULT_PASS=node01"
+    hostname: rabbitmq 
+  dispatcher_events:
+    image: acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.dispatcher.events.4:1.0
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: "0.2"
+          memory: 256M
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+    networks:
+      - apps 
+    depends_on:
+       - rabbitmq
+  dispatcher_alarms:
+    image: acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.dispatcher.alarms.4:1.0
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: "0.2"
+          memory: 256M
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+    networks:
+      - apps 
+    depends_on:
+       - rabbitmq	
+  dispatcher_products:
+    image: acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.dispatcher.products.4:1.0
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: "0.2"
+          memory: 256M
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+    networks:
+      - apps 
+    depends_on:
+       - rabbitmq	   
+networks:
+  apps:
+##############################################################
+
+##############################################################
+#
+#  INSTALLAZIONE VIA DOCKER STACK su SWARM
+#
+##############################################################
+
+
+docker login --username acr001cloudservices --password xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx acr001cloudservices.azurecr.io
+docker stack rm layeredfactoryacquisition 
+docker pull acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition:rabbitmq-v.1.0
+docker pull acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.dispatcher.events.1:1.0
+docker pull acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.dispatcher.alarms.1:1.0
+docker pull acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.dispatcher.products.1:1.0
+docker stack deploy -c docker-compose.yml layeredfactoryacquisition
+
+docker login --username acr001cloudservices --password xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx acr001cloudservices.azurecr.io
+docker stack rm layeredfactoryacquisition 
+docker pull acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition:rabbitmq-v.1.0
+docker pull acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.dispatcher.events.2:1.0
+docker pull acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.dispatcher.alarms.2:1.0
+docker pull acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.dispatcher.products.2:1.0
+docker stack deploy -c docker-compose.yml layeredfactoryacquisition
+
+docker login --username acr001cloudservices --password xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx acr001cloudservices.azurecr.io
+docker stack rm layeredfactoryacquisition 
+docker pull acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition:rabbitmq-v.1.0
+docker pull acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.dispatcher.events.3:1.0
+docker pull acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.dispatcher.alarms.3:1.0
+docker pull acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.dispatcher.products.3:1.0
+docker stack deploy -c docker-compose.yml layeredfactoryacquisition
+
+docker login --username acr001cloudservices --password xxxxxxxxxxxxxxxxxxxxxxxxxxxxx acr001cloudservices.azurecr.io
+docker stack rm layeredfactoryacquisition 
+docker pull acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition:rabbitmq-v.1.0
+docker pull acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.dispatcher.events.4:1.0
+docker pull acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.dispatcher.alarms.4:1.0
+docker pull acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.dispatcher.products.4:1.0
+docker stack deploy -c docker-compose.yml layeredfactoryacquisition
+
+
+ci sono tre servizi: 
+/opt/kafka_2.12-2.1.0/bin/zookeeper-server-start.sh -daemon /opt/kafka_2.12-2.1.0/config/zookeeper.properties
+/opt/kafka_2.12-2.1.0/bin/kafka-server-start.sh -daemon /opt/kafka_2.12-2.1.0/config/server.properties
+xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+Stoppare sempre prima kafka, poi zookeeper
+/opt/kafka_2.12-2.1.0/bin/kafka-server-stop.sh
+/opt/kafka_2.12-2.1.0/bin/zookeeper-server-stop.sh
+/opt/kafka_2.12-2.1.0/bin/zookeeper-server-start.sh -daemon /opt/kafka_2.12-2.1.0/config/zookeeper.properties
+/opt/kafka_2.12-2.1.0/bin/kafka-server-start.sh -daemon /opt/kafka_2.12-2.1.0/config/server.properties
+
+
+Simulare localmente Producer e Consumer
+kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic hello --from-beginning
+kafka-console-producer.sh --broker-list localhost:9092 --topic my-topic
+
+
+CANCELLARE TOPIC
+/opt/kafka_2.12-2.1.0/bin/kafka-topics.sh --zookeeper localhost:2181 --delete --topic alarms
+/opt/kafka_2.12-2.1.0/bin/kafka-topics.sh --zookeeper localhost:2181 --delete --topic events
+/opt/kafka_2.12-2.1.0/bin/kafka-topics.sh --zookeeper localhost:2181 --delete --topic products
+
+LISTA TOPICS
+/opt/kafka_2.12-2.1.0/bin/kafka-topics.sh --zookeeper localhost:2181 --list
+
+CREARE TOPIC
+/opt/kafka_2.12-2.1.0/bin/kafka-topics.sh --create --zookeeper localhost:2181 --replication-factor 3 --partitions 3 --topic alarms
+/opt/kafka_2.12-2.1.0/bin/kafka-topics.sh --create --zookeeper localhost:2181 --replication-factor 3 --partitions 3 --topic events
+/opt/kafka_2.12-2.1.0/bin/kafka-topics.sh --create --zookeeper localhost:2181 --replication-factor 3 --partitions 3 --topic products
+
+
+START 
+/opt/kafka_2.12-2.1.0/bin/zookeeper-server-start.sh /opt/kafka_2.12-2.1.0/config/zookeeper.properties
+/opt/kafka_2.12-2.1.0/bin/kafka-server-start.sh /opt/kafka_2.12-2.1.0/config/server.properties
+
+
+
+xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+Abbiamo fatto 1 PIP come load balancer, e 3 PIP come nodi singoli, in modo che abbia risposte da indirizzi dns buoni e non canonical host name
+
+
+
+
+#############################################################
+#############################################################
+#
+#
+#  AGGIUNGIAMO LA RETE e la VM ORLEANS (Linux CoreOS)
+#
+#
+#############################################################
+#############################################################
+
+$ResourceGroup="z00060-RG-001"
+$OrderCode="z00060"
+$PrimaryDataCenter="westeurope"
+$SubscriptionID=az account show --query [id] --output tsv
+
+# Create a network security group rule for port 30000.
+az network nsg rule create --resource-group ${ResourceGroup} --nsg-name ${OrderCode}-NSG-002 --name RULE-30000-ORLEANS01-NSG --protocol tcp --direction inbound --source-address-prefix '*' --source-port-range '*' --destination-address-prefix '*' --destination-port-range 30000 --access allow --priority 1500
+
+# Create a network security group rule for port 30000.
+az network nsg rule create --resource-group ${ResourceGroup} --nsg-name ${OrderCode}-NSG-002 --name RULE-30000-ORLEANS02-NSG --protocol tcp --direction inbound --source-address-prefix '*' --source-port-range '*' --destination-address-prefix '*' --destination-port-range 11111 --access allow --priority 1600
+
+
+# Create four virtual network cards and associate with public IP address and NSG.
+For ( $i=1; $i -le 1; $i++ ) {
+  az network nic create --resource-group ${ResourceGroup} --name ${OrderCode}-NIC-70$i --vnet-name ${OrderCode}-VNT-002 --subnet ${OrderCode}-SNT-003 --network-security-group ${OrderCode}-NSG-002
+}
+
+# Create four public addresses.
+For ( $i=1; $i -le 1; $i++ ) {
+  az network public-ip create --resource-group ${ResourceGroup} --name ${OrderCode}-PIP-70$i --dns-name actornode70$i --allocation-method Static
+}
+
+# Create four virtual machines, this creates SSH keys if not present.
+For ( $i=1; $i -le 1; $i++ ) {
+  az vm create --resource-group ${ResourceGroup} --name ${OrderCode}BRIDGE70$i --nics ${OrderCode}-NIC-70$i  --os-disk-name ${OrderCode}-HDOS-70$i --image Win2016Datacenter --authentication-type password --admin-username azureuser --admin-password ZaRik6e4!!!! --no-wait --size Standard_B4ms
+}
+
+#FACCIAMO IL CLUSTER in RING
+#DEPLOYAMO I DOCKER CONTAINER DI INGESTION
+
+
+#############################################################
+#############################################################
+#
+#
+#  FACCIAMO I LSERVER ORLEANS (bisogna copiare 
+#  (le classi Idevice e deviceActor nello stesso progetto
+#  togliendo le referenze, altrimenti non ce la fa docker)
+#
+#
+#############################################################
+#############################################################
+
+
+docker login --username acr001cloudservices --password xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx acr001cloudservices.azurecr.io
+docker build -f Dockerfile -t demo.layeredfactory.device.actorserver:1.0 .
+docker tag demo.layeredfactory.device.actorserver:1.0 acr001cloudservices.azurecr.io/demo.layeredfactory.device.actorserver:1.0
+docker push acr001cloudservices.azurecr.io/demo.layeredfactory.device.actorserver:1.0
+clear
+
+docker login --username acr001cloudservices --password xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx acr001cloudservices.azurecr.io
+docker pull acr001cloudservices.azurecr.io/demo.layeredfactory.device.actorserver:1.0
+
+
+docker run -d --hostname localhost --name orleans -p 30000:30000 acr001cloudservices.azurecr.io/demo.layeredfactory.device.actorserver:1.0
+
+
+
+
+#########TIPICO DOCKERFILE DA CONSOLE APP NETCORE: 
+
+FROM microsoft/dotnet:2.1-sdk AS build-env
+WORKDIR /app
+# Copy csproj and restore as distinct layers
+COPY *.csproj ./
+RUN dotnet restore
+# Copy everything else and build
+COPY . ./
+RUN dotnet publish -c Release -o out
+# Build runtime image
+FROM microsoft/dotnet:2.1-runtime
+WORKDIR /app
+COPY --from=build-env /app/out .
+ENTRYPOINT dotnet Z.IIoT.MessageDispatcher.dll
+
+
+
+
+
+
+
+kind: Deployment
+apiVersion: extensions/v1beta1
+metadata:
+  name: loader-events-vs-edge001
+spec:
+  replicas: 1
+  template:
+    metadata:
+      name: loader-events-vs-edge001
+      labels:
+        name: loader-events-vs-edge001
+    spec:
+      containers:
+      - name: loader-events-vs-edge001
+        image: acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.loader.1:1.0
+        imagePullPolicy: Always
+      imagePullSecrets:
+        - name: acr001cloudservices-secretname
+---
+kind: Deployment
+apiVersion: extensions/v1beta1
+metadata:
+  name: loader-events-vs-edge002
+spec:
+  replicas: 1
+  template:
+    metadata:
+      name: loader-events-vs-edge002
+      labels:
+        name: loader-events-vs-edge002
+    spec:
+      containers:
+      - name: loader-events-vs-edge002
+        image: acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.loader.2:1.0
+        imagePullPolicy: Always
+      imagePullSecrets:
+        - name: acr001cloudservices-secretname
+---
+kind: Deployment
+apiVersion: extensions/v1beta1
+metadata:
+  name: loader-events-vs-edge003
+spec:
+  replicas: 1
+  template:
+    metadata:
+      name: loader-events-vs-edge003
+      labels:
+        name: loader-events-vs-edge003
+    spec:
+      containers:
+      - name: loader-events-vs-edge003
+        image: acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.loader.3:1.0
+        imagePullPolicy: Always
+      imagePullSecrets:
+        - name: acr001cloudservices-secretname
+---
+kind: Deployment
+apiVersion: extensions/v1beta1
+metadata:
+  name: loader-events-vs-edge004
+spec:
+  replicas: 1
+  template:
+    metadata:
+      name: loader-events-vs-edge004
+      labels:
+        name: loader-events-vs-edge004
+    spec:
+      containers:
+      - name: loader-events-vs-edge004
+        image: acr001cloudservices.azurecr.io/demo.layeredfactory.acquisition.loader.4:1.0
+        imagePullPolicy: Always
+      imagePullSecrets:
+        - name: acr001cloudservices-secretname
+
+		
