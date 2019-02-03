@@ -1,2 +1,4 @@
 # iiotlayeredarchitecture_demo
-IIoT layred architecture course - Demo about RabbitMQ, Kafka and Orleans
+IIoT layered architecture course - Demo about RabbitMQ, Kafka and Orleans
+
+#KEEP ATTENTION: these are only notes, not production ready code! 
